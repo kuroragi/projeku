@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+  --color-bg: #0F1115;
+  --color-surface-1: #151821;
+  --color-surface-2: #1B1F2A;
+  --color-surface-3: #232836;
+  --color-border: #2A3040;
+  --color-border-strong: #3A4157;
+  --color-text: #E6E8EE;
+  --color-text-muted: #A3AABD;
+  --color-text-faint: #8089A0;
+  --color-accent: #8B7CF6;
+  --color-accent-hover: #A094F8;
+  --color-on-accent: #0F1115;
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-danger: #F87171;
+  --color-info: #60A5FA;
+
+  --color-accent-soft: rgba(139, 124, 246, 0.16);
+  --color-success-soft: rgba(74, 222, 128, 0.16);
+  --color-warning-soft: rgba(251, 191, 36, 0.16);
+  --color-danger-soft: rgba(248, 113, 113, 0.16);
+  --color-info-soft: rgba(96, 165, 250, 0.16);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --color-bg: #FFFFFF;
+    --color-surface-1: #FFFFFF;
+    --color-surface-2: #F8FAFC;
+    --color-surface-3: #F1F5F9;
+    --color-border: #E2E8F0;
+    --color-text: #111827;
+    --color-text-muted: #4B5563;
+    --color-accent: #4F46E5;
+  }
+  @page { size: A4 landscape; margin: 12mm; }
+  .no-print { display: none !important; }
+  .slide { break-after: page; break-inside: avoid; }
+  .slide img { print-color-adjust: exact; }
+}

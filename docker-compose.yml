@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: my-laravel-8.5:ready
+    container_name: ${PROJECT_NAME}_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/apache.conf:/etc/apache2/sites-available/000-default.conf:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dev-network"
+      - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${PROJECT_NAME}.test`)"
+      - "traefik.http.routers.${PROJECT_NAME}.entrypoints=web"
+      - "traefik.http.services.${PROJECT_NAME}.loadbalancer.server.port=80"
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    external: true
