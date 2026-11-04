@@ -83,6 +83,41 @@ $dimensionClass = $sizeClasses[$size] ?? "h-[{$size}px] w-[{$size}px]";
         @case('document')
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             @break
+        @case('presentation')
+        @case('play')
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 21h8m-4-4v4" />
+            @break
+        @case('arrow-left')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            @break
+        @case('arrow-right')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            @break
+        @case('grip')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" />
+            @break
+        @case('image')
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 15l-5-5L5 21" />
+            @break
+        @case('list')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+            @break
+        @case('type')
+        @case('heading')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V4h16v3M9 20h6M12 4v16" />
+            @break
+        @case('printer')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0v4h12v-4" />
+            @break
+        @case('maximize')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
+            @break
+        @case('minimize')
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m-6 0V4m0 6l7-7" />
+            @break
         @default
             <circle cx="12" cy="12" r="10" />
     @endswitch

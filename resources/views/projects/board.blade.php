@@ -315,10 +315,35 @@
                                     <div class="group relative aspect-video overflow-hidden rounded-[6px] border border-border bg-surface-3">
                                         <img :src="`/projects/${projectId}/files/${f.id}?thumb=1`" class="h-full w-full object-cover" />
                                         <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                                            <a :src="`/projects/${projectId}/files/${f.id}`" target="_blank" class="text-xs text-text hover:text-accent">Buka</a>
+                                            <a :href="`/projects/${projectId}/files/${f.id}`" target="_blank" class="text-xs text-text hover:text-accent">Buka</a>
                                         </div>
                                     </div>
                                 </template>
+                            </div>
+                        </div>
+
+                        <!-- Tautan ke Halaman Perencanaan Section -->
+                        <div class="border-t border-border pt-4 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-medium text-text uppercase tracking-wider">Halaman Perencanaan</h4>
+                                <template x-if="activeCard.page_id">
+                                    <a :href="`/projects/${projectId}/planning/${activeCard.page_id}`" class="text-xs text-accent hover:underline flex items-center gap-1">
+                                        <span>Buka Halaman</span>
+                                        <x-icon name="arrow-right" :size="12" />
+                                    </a>
+                                </template>
+                            </div>
+                            <div>
+                                <select 
+                                    x-model="activeCard.page_id" 
+                                    @change="saveActiveCard()" 
+                                    class="w-full rounded-[6px] border border-border bg-surface-3 px-3 py-1.5 text-xs text-text focus:border-accent focus:outline-none"
+                                >
+                                    <option :value="null">-- Tidak tertaut ke perencanaan --</option>
+                                    @foreach($pages as $p)
+                                        <option value="{{ $p->id }}">{{ $p->title }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -401,9 +426,17 @@
                 },
 
                 initSortable() {
+                    const SortableClass = window.Sortable || (typeof Sortable !== 'undefined' ? Sortable : null);
+                    if (!SortableClass) {
+                        setTimeout(() => this.initSortable(), 50);
+                        return;
+                    }
                     const containers = document.querySelectorAll('.card-list');
                     containers.forEach(container => {
-                        new Sortable(container, {
+                        if (container._sortable) {
+                            container._sortable.destroy();
+                        }
+                        container._sortable = new SortableClass(container, {
                             group: 'kanban-cards',
                             animation: 150,
                             ghostClass: 'border-2',

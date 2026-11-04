@@ -50,4 +50,9 @@ class Project extends Model
     {
         return $this->hasMany(File::class);
     }
+
+    public function pages(): HasMany
+    {
+        return $this->hasMany(Page::class)->orderBy('position');
+    }
 }

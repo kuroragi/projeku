@@ -28,6 +28,7 @@ class CardController extends Controller
         }
 
         $labels = $project->labels()->get();
+        $pages = $project->pages()->select('id', 'title')->orderBy('position')->get();
         $members = DB::table('model_has_roles')
             ->join('users', 'users.id', '=', 'model_has_roles.model_id')
             ->where('model_has_roles.project_id', $project->id)
@@ -36,7 +37,7 @@ class CardController extends Controller
             ->distinct()
             ->get();
 
-        return view('projects.board', compact('project', 'columns', 'labels', 'members'));
+        return view('projects.board', compact('project', 'columns', 'labels', 'members', 'pages'));
     }
 
     public function store(Request $request, Project $project, Column $column)
@@ -52,6 +53,7 @@ class CardController extends Controller
             'description' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:low,normal,high'],
             'due_at' => ['nullable', 'date'],
+            'page_id' => ['nullable', 'integer', 'exists:pages,id'],
             'label_ids' => ['nullable', 'array'],
             'label_ids.*' => ['integer', 'exists:labels,id'],
             'assignee_ids' => ['nullable', 'array'],
@@ -68,6 +70,7 @@ class CardController extends Controller
                 'description' => $validated['description'] ?? null,
                 'priority' => $validated['priority'] ?? 'normal',
                 'due_at' => $validated['due_at'] ?? null,
+                'page_id' => $validated['page_id'] ?? null,
                 'position' => $position,
             ]);
 
@@ -92,7 +95,7 @@ class CardController extends Controller
             return $card;
         });
 
-        $card->load(['labels', 'assignees', 'checklists.items', 'files']);
+        $card->load(['labels', 'assignees', 'checklists.items', 'files', 'page']);
 
         if ($request->wantsJson()) {
             return response()->json($card, 201);
@@ -109,7 +112,7 @@ class CardController extends Controller
             abort(404);
         }
 
-        $card->load(['labels', 'assignees', 'checklists.items', 'files']);
+        $card->load(['labels', 'assignees', 'checklists.items', 'files', 'page']);
 
         return response()->json($card);
     }
@@ -127,6 +130,7 @@ class CardController extends Controller
             'description' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:low,normal,high'],
             'due_at' => ['nullable', 'date'],
+            'page_id' => ['nullable', 'integer', 'exists:pages,id'],
             'label_ids' => ['nullable', 'array'],
             'label_ids.*' => ['integer', 'exists:labels,id'],
             'assignee_ids' => ['nullable', 'array'],
@@ -134,12 +138,18 @@ class CardController extends Controller
         ]);
 
         DB::transaction(function () use ($card, $validated) {
-            $card->update([
+            $dataToUpdate = [
                 'title' => $validated['title'] ?? $card->title,
                 'description' => array_key_exists('description', $validated) ? $validated['description'] : $card->description,
                 'priority' => $validated['priority'] ?? $card->priority,
                 'due_at' => array_key_exists('due_at', $validated) ? $validated['due_at'] : $card->due_at,
-            ]);
+            ];
+
+            if (array_key_exists('page_id', $validated)) {
+                $dataToUpdate['page_id'] = $validated['page_id'];
+            }
+
+            $card->update($dataToUpdate);
 
             if (isset($validated['label_ids'])) {
                 $syncLabels = [];
@@ -160,7 +170,7 @@ class CardController extends Controller
             ReminderService::syncCardReminders($card);
         });
 
-        $card->load(['labels', 'assignees', 'checklists.items', 'files']);
+        $card->load(['labels', 'assignees', 'checklists.items', 'files', 'page']);
 
         if ($request->wantsJson()) {
             return response()->json($card);

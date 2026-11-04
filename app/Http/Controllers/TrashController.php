@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Card;
 use App\Models\File;
+use App\Models\Page;
 use App\Models\Project;
 use App\Services\ProjectAccess;
 use App\Services\ReminderService;
@@ -26,14 +27,20 @@ class TrashController extends Controller
             ->latest('deleted_at')
             ->get();
 
+        $trashedPages = Page::onlyTrashed()
+            ->where('project_id', $project->id)
+            ->latest('deleted_at')
+            ->get();
+
         if (request()->wantsJson()) {
             return response()->json([
                 'cards' => $trashedCards,
                 'files' => $trashedFiles,
+                'pages' => $trashedPages,
             ]);
         }
 
-        return view('projects.trash', compact('project', 'trashedCards', 'trashedFiles'));
+        return view('projects.trash', compact('project', 'trashedCards', 'trashedFiles', 'trashedPages'));
     }
 
     public function restoreCard(Request $request, Project $project, int $cardId)
@@ -71,6 +78,24 @@ class TrashController extends Controller
         }
 
         return back()->with('status', 'Berkas berhasil dipulihkan.');
+    }
+
+    public function restorePage(Request $request, Project $project, int $pageId)
+    {
+        ProjectAccess::authorize($project, 'trash.restore');
+
+        $page = Page::onlyTrashed()
+            ->where('project_id', $project->id)
+            ->where('id', $pageId)
+            ->firstOrFail();
+
+        $page->restore();
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Halaman berhasil dipulihkan.']);
+        }
+
+        return back()->with('status', 'Halaman berhasil dipulihkan.');
     }
 
     public function purgeCard(Request $request, Project $project, int $cardId)
@@ -116,5 +141,22 @@ class TrashController extends Controller
 
         return back()->with('status', 'Berkas berhasil dimusnahkan secara permanen.');
     }
-}
 
+    public function purgePage(Request $request, Project $project, int $pageId)
+    {
+        ProjectAccess::authorize($project, 'trash.purge');
+
+        $page = Page::onlyTrashed()
+            ->where('project_id', $project->id)
+            ->where('id', $pageId)
+            ->firstOrFail();
+
+        $page->forceDelete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Halaman berhasil dimusnahkan secara permanen.']);
+        }
+
+        return back()->with('status', 'Halaman berhasil dimusnahkan secara permanen.');
+    }
+}

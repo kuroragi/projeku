@@ -61,5 +61,10 @@ class Card extends Model
     {
         return $this->belongsToMany(File::class, 'card_file')->withTimestamps();
     }
+
+    public function page(): BelongsTo
+    {
+        return $this->belongsTo(Page::class, 'page_id');
+    }
 }
 

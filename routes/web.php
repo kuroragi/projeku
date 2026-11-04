@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\BlockController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ColumnController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LabelController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\TrashController;
@@ -16,7 +18,7 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    // Preferensi Pengguna (Notifikasi Email)
+    // Preferensi Pengguna
     Route::patch('/user/preferences', function (\Illuminate\Http\Request $request) {
         $validated = $request->validate([
             'notify_email' => ['required', 'boolean'],
@@ -72,12 +74,27 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/projects/{project}/files/{file}', [FileController::class, 'serve'])->name('projects.files.serve');
     Route::delete('/projects/{project}/files/{file}', [FileController::class, 'destroy'])->name('projects.files.destroy');
 
-    // Tempat Sampah / Trash (Tahap 2)
+    // Halaman Perencanaan & Blok (Tahap 4)
+    Route::get('/projects/{project}/planning', [PageController::class, 'index'])->name('projects.planning.index');
+    Route::post('/projects/{project}/planning', [PageController::class, 'store'])->name('projects.planning.store');
+    Route::get('/projects/{project}/planning/{page}', [PageController::class, 'show'])->name('projects.pages.show');
+    Route::patch('/projects/{project}/planning/{page}', [PageController::class, 'update'])->name('projects.pages.update');
+    Route::delete('/projects/{project}/planning/{page}', [PageController::class, 'destroy'])->name('projects.pages.destroy');
+    Route::get('/projects/{project}/planning/{page}/presentation', [PageController::class, 'presentation'])->name('projects.pages.presentation');
+
+    Route::post('/projects/{project}/planning/{page}/blocks', [BlockController::class, 'store'])->name('projects.blocks.store');
+    Route::patch('/projects/{project}/planning/{page}/blocks/{block}', [BlockController::class, 'update'])->name('projects.blocks.update');
+    Route::delete('/projects/{project}/planning/{page}/blocks/{block}', [BlockController::class, 'destroy'])->name('projects.blocks.destroy');
+    Route::post('/projects/{project}/planning/{page}/blocks/reorder', [BlockController::class, 'reorder'])->name('projects.blocks.reorder');
+
+    // Tempat Sampah / Trash
     Route::get('/projects/{project}/trash', [TrashController::class, 'index'])->name('projects.trash.index');
     Route::post('/projects/{project}/trash/cards/{id}/restore', [TrashController::class, 'restoreCard'])->name('projects.trash.cards.restore');
     Route::post('/projects/{project}/trash/files/{id}/restore', [TrashController::class, 'restoreFile'])->name('projects.trash.files.restore');
+    Route::post('/projects/{project}/trash/pages/{id}/restore', [TrashController::class, 'restorePage'])->name('projects.trash.pages.restore');
     Route::delete('/projects/{project}/trash/cards/{id}', [TrashController::class, 'purgeCard'])->name('projects.trash.cards.purge');
     Route::delete('/projects/{project}/trash/files/{id}', [TrashController::class, 'purgeFile'])->name('projects.trash.files.purge');
+    Route::delete('/projects/{project}/trash/pages/{id}', [TrashController::class, 'purgePage'])->name('projects.trash.pages.purge');
 
     // Kelola Pengguna (Admin Only)
     Route::prefix('admin')->name('admin.')->group(function () {

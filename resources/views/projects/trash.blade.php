@@ -15,6 +15,10 @@
                     <x-icon name="board" :size="16" />
                     <span>Board</span>
                 </a>
+                <a href="{{ route('projects.planning.index', $project) }}" class="flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-xs font-medium text-text-muted hover:text-text transition">
+                    <x-icon name="document" :size="16" />
+                    <span>Perencanaan</span>
+                </a>
                 <a href="{{ route('projects.files.index', $project) }}" class="flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-xs font-medium text-text-muted hover:text-text transition">
                     <x-icon name="folder" :size="16" />
                     <span>Berkas</span>
@@ -91,6 +95,45 @@
                                     </form>
 
                                     <form method="POST" action="{{ route('projects.trash.files.purge', [$project, $f->id]) }}" onsubmit="return confirm('Musnahkan berkas fisik dari server secara permanen?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <x-button type="submit" variant="danger" size="sm">
+                                            Hapus Permanen
+                                        </x-button>
+                                    </form>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            <!-- Bagian 3: Halaman Perencanaan yang Dihapus -->
+            <div>
+                <h3 class="text-sm font-semibold text-text mb-3">Halaman Perencanaan yang Dihapus ({{ $trashedPages->count() }})</h3>
+                @if($trashedPages->isEmpty())
+                    <p class="text-xs text-text-faint italic">Tidak ada halaman perencanaan di tempat sampah.</p>
+                @else
+                    <div class="divide-y divide-border rounded-[8px] border border-border bg-surface-2">
+                        @foreach($trashedPages as $p)
+                            <div class="flex items-center justify-between p-3.5 text-xs">
+                                <div>
+                                    <h4 class="font-medium text-text">{{ $p->title }}</h4>
+                                    <p class="text-[11px] text-text-faint mt-0.5">
+                                        Dihapus pada {{ $p->deleted_at->format('d M Y H:i') }} • 
+                                        Sisa {{ max(0, 30 - $p->deleted_at->diffInDays(now())) }} hari sebelum musnah otomatis
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <form method="POST" action="{{ route('projects.trash.pages.restore', [$project, $p->id]) }}">
+                                        @csrf
+                                        <x-button type="submit" variant="secondary" size="sm">
+                                            Pulihkan
+                                        </x-button>
+                                    </form>
+
+                                    <form method="POST" action="{{ route('projects.trash.pages.purge', [$project, $p->id]) }}" onsubmit="return confirm('Musnahkan dokumen ini secara permanen?');">
                                         @csrf
                                         @method('DELETE')
                                         <x-button type="submit" variant="danger" size="sm">
