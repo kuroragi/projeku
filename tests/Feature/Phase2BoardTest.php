@@ -273,5 +273,217 @@ class Phase2BoardTest extends TestCase
         $ownerPurge->assertStatus(200);
         $this->assertDatabaseMissing('cards', ['id' => $card->id]);
     }
+
+    /** 8. Revisi 1: Ubah Nama Kolom (Validasi, Izin, dan Proteksi Lintas Projek) */
+    public function test_column_rename_validation_and_permissions(): void
+    {
+        $col = $this->columnTodo;
+
+        // 1. Viewer ditolak 403
+        $this->actingAs($this->viewer)
+            ->patchJson("/projects/{$this->project->id}/columns/{$col->id}", ['name' => 'Nama Baru'])
+            ->assertStatus(403);
+
+        // 2. Non-anggota ditolak 404
+        $this->actingAs($this->outsider)
+            ->patchJson("/projects/{$this->project->id}/columns/{$col->id}", ['name' => 'Nama Baru'])
+            ->assertStatus(404);
+
+        // 3. Kolom milik projek lain lewat URL projek sendiri -> 404
+        $otherProject = Project::create(['name' => 'Projek Lain']);
+        $otherCol = $otherProject->columns()->create(['name' => 'Kolom Lain', 'position' => 1000]);
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/columns/{$otherCol->id}", ['name' => 'Hack'])
+            ->assertStatus(404);
+
+        // 4. Nama kosong -> 422
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/columns/{$col->id}", ['name' => ''])
+            ->assertStatus(422);
+
+        // 5. Nama lebih dari 60 karakter -> 422
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/columns/{$col->id}", ['name' => str_repeat('A', 61)])
+            ->assertStatus(422);
+
+        // 6. Nama valid oleh Editor -> 200
+        $res = $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/columns/{$col->id}", ['name' => ' Backlog Terverifikasi ']);
+        $res->assertStatus(200);
+        $this->assertEquals('Backlog Terverifikasi', $col->fresh()->name);
+    }
+
+    /** 8b. Pengguna anggota dapat memuat halaman board tanpa error Blade */
+    public function test_member_can_view_board_page(): void
+    {
+        $response = $this->actingAs($this->editor)->get("/projects/{$this->project->id}/board");
+        $response->assertStatus(200);
+        $response->assertSee('Board');
+    }
+
+    /** 9. Revisi 1: Simpan Eksplisit & Deteksi Konflik Optimistic Locking (Status 409) */
+    public function test_card_optimistic_locking_conflict_detection(): void
+    {
+        $card = $this->columnTodo->cards()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Kartu Asli',
+            'position' => 1000,
+            'priority' => 'normal',
+        ]);
+
+        $currentVersion = $card->updated_at->toISOString();
+
+        // Majukan waktu agar request 1 menghasilkan timestamp berbeda
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::now()->addSeconds(5));
+
+        // 1. Simpan dengan version yang cocok -> Berhasil 200
+        $res1 = $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Judul Baru Oleh Editor 1',
+                'priority' => 'high',
+                'version' => $currentVersion,
+            ]);
+        $res1->assertStatus(200);
+        $this->assertEquals('Judul Baru Oleh Editor 1', $card->fresh()->title);
+
+        // 2. Simpan dengan version lama yang sudah berubah (misal dari tab lain) -> Ditolak 409
+        $res2 = $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Judul Telat Oleh Editor 2',
+                'priority' => 'low',
+                'version' => $currentVersion, // version lama
+            ]);
+        $res2->assertStatus(409)
+            ->assertJson(['message' => 'Kartu diubah orang lain sejak kamu membukanya.']);
+
+        // Pastikan isi kartu TIDAK tertimpa oleh versi yang konflik
+        $this->assertEquals('Judul Baru Oleh Editor 1', $card->fresh()->title);
+
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    /** 10. Revisi 1: Validasi Penanggung Jawab & Label Lintas Projek */
+    public function test_card_assignee_and_label_cross_project_isolation(): void
+    {
+        $card = $this->columnTodo->cards()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Kartu Validasi',
+            'position' => 1000,
+            'priority' => 'normal',
+        ]);
+
+        // Label milik projek lain
+        $otherProject = Project::create(['name' => 'Projek Tetangga']);
+        $otherLabel = Label::create([
+            'project_id' => $otherProject->id,
+            'name' => 'Label Asing',
+            'color' => 'blue',
+        ]);
+
+        // Coba pasang label milik projek lain -> 422
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Uji Label Asing',
+                'label_ids' => [$otherLabel->id],
+            ])
+            ->assertStatus(422);
+
+        // Coba pasang penanggung jawab yang bukan anggota projek -> 422
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Uji Assignee Asing',
+                'assignee_ids' => [$this->outsider->id],
+            ])
+            ->assertStatus(422);
+
+        // Viewer mencoba menyimpan -> 403
+        $this->actingAs($this->viewer)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Ubah oleh Viewer',
+            ])
+            ->assertStatus(403);
+
+        // Kartu projek lain lewat URL projek sendiri -> 404
+        $otherCol = $otherProject->columns()->create(['name' => 'Kolom Lain', 'position' => 1000]);
+        $otherCard = $otherCol->cards()->create([
+            'project_id' => $otherProject->id,
+            'title' => 'Kartu Asing',
+            'position' => 1000,
+        ]);
+        $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$otherCard->id}", [
+                'title' => 'Hack Kartu Lain',
+            ])
+            ->assertStatus(404);
+    }
+
+    /** 11. Revisi 1: Simpan detail kartu lengkap dan pengosongan nilai (due_at & page_id) */
+    public function test_card_detail_full_save_and_clear_lifecycle(): void
+    {
+        $page = $this->project->pages()->create([
+            'title' => 'Dokumen Sprint Planning',
+            'position' => 1000,
+        ]);
+
+        $label = $this->project->labels()->create([
+            'name' => 'Backend API',
+            'color' => '#818CF8',
+        ]);
+
+        $card = $this->columnTodo->cards()->create([
+            'project_id' => $this->project->id,
+            'title' => 'Implementasi Endpoint',
+            'position' => 1000,
+            'priority' => 'normal',
+        ]);
+
+        // 1. Simpan detail lengkap (title, description, priority, due_at, page_id, labels, assignees)
+        $dueAtIso = '2026-11-20T10:00:00.000000Z';
+        $res = $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Implementasi Endpoint v2',
+                'description' => 'Deskripsi rinci implementasi',
+                'priority' => 'high',
+                'due_at' => $dueAtIso,
+                'page_id' => $page->id,
+                'label_ids' => [$label->id],
+                'assignee_ids' => [$this->editor->id],
+                'version' => $card->updated_at->toISOString(),
+            ]);
+
+        $res->assertStatus(200);
+        $card->refresh();
+
+        $this->assertEquals('Implementasi Endpoint v2', $card->title);
+        $this->assertEquals('Deskripsi rinci implementasi', $card->description);
+        $this->assertEquals('high', $card->priority);
+        $this->assertEquals($page->id, $card->page_id);
+        $this->assertCount(1, $card->labels);
+        $this->assertCount(1, $card->assignees);
+
+        // 2. Simpan untuk mengosongkan due_at, page_id, labels, dan assignees
+        $resClear = $this->actingAs($this->editor)
+            ->patchJson("/projects/{$this->project->id}/cards/{$card->id}", [
+                'title' => 'Implementasi Endpoint v2 (Tanpa Tenggat & Halaman)',
+                'description' => null,
+                'priority' => 'normal',
+                'due_at' => null,
+                'page_id' => null,
+                'label_ids' => [],
+                'assignee_ids' => [],
+                'version' => $card->updated_at->toISOString(),
+            ]);
+
+        $resClear->assertStatus(200);
+        $card->refresh();
+
+        $this->assertEquals('Implementasi Endpoint v2 (Tanpa Tenggat & Halaman)', $card->title);
+        $this->assertNull($card->description);
+        $this->assertEquals('normal', $card->priority);
+        $this->assertNull($card->due_at);
+        $this->assertNull($card->page_id);
+        $this->assertCount(0, $card->labels);
+        $this->assertCount(0, $card->assignees);
+    }
 }
 

@@ -8,7 +8,9 @@ use App\Models\Project;
 use App\Services\ProjectAccess;
 use App\Services\ReminderService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class CardController extends Controller
 {
@@ -49,15 +51,15 @@ class CardController extends Controller
         }
 
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:low,normal,high'],
             'due_at' => ['nullable', 'date'],
-            'page_id' => ['nullable', 'integer', 'exists:pages,id'],
+            'page_id' => ['nullable', 'integer', Rule::exists('pages', 'id')->where('project_id', $project->id)],
             'label_ids' => ['nullable', 'array'],
-            'label_ids.*' => ['integer', 'exists:labels,id'],
+            'label_ids.*' => ['integer', Rule::exists('labels', 'id')->where('project_id', $project->id)],
             'assignee_ids' => ['nullable', 'array'],
-            'assignee_ids.*' => ['integer', 'exists:users,id'],
+            'assignee_ids.*' => ['integer', Rule::in($project->memberIds())],
         ]);
 
         $maxPosition = (int) $column->cards()->max('position');
@@ -121,62 +123,77 @@ class CardController extends Controller
     {
         ProjectAccess::authorize($project, 'board.edit');
 
-        if ($card->project_id !== $project->id) {
-            abort(404);
-        }
+        abort_unless($card->project_id === $project->id, 404);
 
         $validated = $request->validate([
-            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'title' => ['sometimes', 'required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:low,normal,high'],
             'due_at' => ['nullable', 'date'],
-            'page_id' => ['nullable', 'integer', 'exists:pages,id'],
+            'page_id' => ['nullable', 'integer', Rule::exists('pages', 'id')->where('project_id', $project->id)],
             'label_ids' => ['nullable', 'array'],
-            'label_ids.*' => ['integer', 'exists:labels,id'],
+            'label_ids.*' => ['integer', Rule::exists('labels', 'id')->where('project_id', $project->id)],
             'assignee_ids' => ['nullable', 'array'],
-            'assignee_ids.*' => ['integer', 'exists:users,id'],
+            'assignee_ids.*' => ['integer', Rule::in($project->memberIds())],
+            'version' => ['nullable', 'string'],
         ]);
 
-        DB::transaction(function () use ($card, $validated) {
+        return DB::transaction(function () use ($request, $project, $card, $validated) {
+            $lockedCard = Card::whereKey($card->id)->lockForUpdate()->firstOrFail();
+
+            if ($request->filled('version')) {
+                $clientTimestamp = Carbon::parse($request->version)->getTimestamp();
+                if ($lockedCard->updated_at->getTimestamp() !== $clientTimestamp) {
+                    return response()->json(['message' => 'Kartu diubah orang lain sejak kamu membukanya.'], 409);
+                }
+            }
+
+            $dueAt = $lockedCard->due_at;
+            if (array_key_exists('due_at', $validated)) {
+                $dueAt = ($validated['due_at'] !== null && $validated['due_at'] !== '') ? $validated['due_at'] : null;
+            }
+
             $dataToUpdate = [
-                'title' => $validated['title'] ?? $card->title,
-                'description' => array_key_exists('description', $validated) ? $validated['description'] : $card->description,
-                'priority' => $validated['priority'] ?? $card->priority,
-                'due_at' => array_key_exists('due_at', $validated) ? $validated['due_at'] : $card->due_at,
+                'title' => $validated['title'] ?? $lockedCard->title,
+                'description' => array_key_exists('description', $validated) ? $validated['description'] : $lockedCard->description,
+                'priority' => $validated['priority'] ?? $lockedCard->priority,
+                'due_at' => $dueAt,
             ];
 
             if (array_key_exists('page_id', $validated)) {
-                $dataToUpdate['page_id'] = $validated['page_id'];
+                $dataToUpdate['page_id'] = ($validated['page_id'] !== null && $validated['page_id'] !== '') ? (int) $validated['page_id'] : null;
             }
 
-            $card->update($dataToUpdate);
+            $lockedCard->update($dataToUpdate);
 
             if (isset($validated['label_ids'])) {
                 $syncLabels = [];
                 foreach ($validated['label_ids'] as $lId) {
-                    $syncLabels[$lId] = ['project_id' => $card->project_id];
+                    $syncLabels[$lId] = ['project_id' => $project->id];
                 }
-                $card->labels()->sync($syncLabels);
+                $lockedCard->labels()->sync($syncLabels);
             }
 
             if (isset($validated['assignee_ids'])) {
                 $syncAssignees = [];
                 foreach ($validated['assignee_ids'] as $uId) {
-                    $syncAssignees[$uId] = ['project_id' => $card->project_id];
+                    $syncAssignees[$uId] = ['project_id' => $project->id];
                 }
-                $card->assignees()->sync($syncAssignees);
+                $lockedCard->assignees()->sync($syncAssignees);
             }
 
-            ReminderService::syncCardReminders($card);
+            ReminderService::syncCardReminders($lockedCard);
+
+            $lockedCard->touch();
+
+            $lockedCard->load(['labels', 'assignees', 'checklists.items', 'files', 'page']);
+
+            if ($request->wantsJson()) {
+                return response()->json($lockedCard);
+            }
+
+            return back()->with('status', 'Kartu berhasil diperbarui.');
         });
-
-        $card->load(['labels', 'assignees', 'checklists.items', 'files', 'page']);
-
-        if ($request->wantsJson()) {
-            return response()->json($card);
-        }
-
-        return back()->with('status', 'Kartu berhasil diperbarui.');
     }
 
     public function move(Request $request, Project $project, Card $card)

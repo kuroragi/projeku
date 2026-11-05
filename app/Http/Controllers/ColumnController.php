@@ -39,20 +39,25 @@ class ColumnController extends Controller
     {
         ProjectAccess::authorize($project, 'board.edit');
 
-        // Pastikan kolom milik projek ini
-        if ($column->project_id !== $project->id) {
-            abort(404);
-        }
+        abort_unless($column->project_id === $project->id, 404);
 
         $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:100'],
-            'is_done' => ['nullable', 'boolean'],
+            'name' => ['sometimes', 'required', 'string', 'max:60'],
+            'is_done' => ['sometimes', 'boolean'],
         ]);
 
-        $column->update($validated);
+        if (array_key_exists('name', $validated)) {
+            $column->name = trim($validated['name']);
+        }
+
+        if (array_key_exists('is_done', $validated)) {
+            $column->is_done = (bool) $validated['is_done'];
+        }
+
+        $column->save();
 
         if ($request->wantsJson()) {
-            return response()->json($column);
+            return response()->json(['name' => $column->name, 'is_done' => $column->is_done]);
         }
 
         return back()->with('status', 'Kolom berhasil diperbarui.');
@@ -83,14 +88,12 @@ class ColumnController extends Controller
     {
         ProjectAccess::authorize($project, 'board.edit');
 
-        if ($column->project_id !== $project->id) {
-            abort(404);
-        }
+        abort_unless($column->project_id === $project->id, 404);
 
         // Aturan keras: Kolom tidak bisa dihapus selama masih berisi kartu (termasuk kartu aktif)
         $hasCards = $column->cards()->exists();
         if ($hasCards) {
-            abort(422, 'Kolom tidak dapat dihapus selama masih berisi kartu.');
+            abort(422, 'Pindahkan kartunya dulu.');
         }
 
         $column->delete();

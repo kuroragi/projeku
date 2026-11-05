@@ -14,11 +14,11 @@ Seluruh komponen UI wajib merujuk pada token di bawah ini. Jangan pernah menggun
 | `--color-surface-2` | `#1B1F2A` | Kartu tugas/kanban, kartu projek, jendela dialog, menu dropdown |
 | `--color-surface-3` | `#232836` | Bidang input, tombol sekunder, kartu keadaan hover |
 
-### B. Garis Tepi (Borders)
-| Token | Heksadesimal | Peruntukan / Penggunaan |
-| :--- | :--- | :--- |
-| `--color-border` | `#2A3040` | Garis tepi biasa (pemisah kontainer, batas kartu statis, input) |
-| `--color-border-strong`| `#3A4157` | Garis tepi saat hover, elemen melayang, batas dialog |
+### B. Garis Tepi (Borders) — Revisi 1
+| Token | Heksadesimal | Peruntukan / Penggunaan | Kontras Relatif |
+| :--- | :--- | :--- | :--- |
+| `--color-border` | `#434B61` | Garis tepi kartu, kolom (1px), pemisah kontainer & tabel | ~1.9:1 terhadap `--surface-2` |
+| `--color-border-strong`| `#6B7388` | Input, select, textarea, tombol sekunder, kotak centang, hover, dialog & menu | ~3.1:1 terhadap `--surface-3` |
 
 ### C. Tipografi & Teks (Text & Typography)
 | Token | Heksadesimal | Peruntukan / Penggunaan | Kontras Relatif |
